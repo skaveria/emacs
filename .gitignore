@@ -1,0 +1,45 @@
+# Emacs temporary files
+*~
+\#*\#
+.\#*
+*#
+
+# Emacs desktop & session
+desktop.ini
+.emacs.desktop
+.session
+
+# Backup files
+*.bak
+*.orig
+*.tmp
+
+# Auto-save files
+# (by default emacs writes these as #file# or .#file)
+\#*#
+.*.swp
+*.swo
+
+# Network/Tramp
+*^T
+
+# Byte-compiled lisp
+*.elc
+
+# Compiled native files (Emacs 28+ native-comp)
+*.eln
+*.eln-cache/
+
+# Local config overrides
+local.el
+custom.el
+
+# Emacs server
+.server
+
+# Shell history
+shell-command-history
+eshell-history
+
+# Projectile cache
+.projectile
