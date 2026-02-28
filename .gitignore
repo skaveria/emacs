@@ -43,3 +43,33 @@ eshell-history
 
 # Projectile cache
 .projectile
+
+# Package manager
+elpa/
+package-lock.json
+
+# Native compilation cache
+eln-cache/
+
+# Auto save / session
+auto-save-list/
+auto-save-list
+recentf
+places
+savehist
+savehist.el
+
+# Customizations (machine-specific)
+custom.el
+
+# Backups
+*~
+#*
+.#*
+*.elc
+
+# OS junk
+.DS_Store
+
+# Temp
+*.log

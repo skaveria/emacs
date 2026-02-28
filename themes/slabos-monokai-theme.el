@@ -1,4 +1,4 @@
-;;; slabos-monokai-theme.el --- SlabOS Doom-Monokai CSS port (literal) -*- lexical-binding: t; -*-
+;;; slabos-monokai-theme.el --- SlabOS Doom-Monokai CSS port (literal + Corfu) -*- lexical-binding: t; -*-
 
 (deftheme slabos-monokai
   "SlabOS Doom-Monokai palette ported from doom-monokai.css tokens (literal values).")
@@ -14,7 +14,7 @@
  '(link    ((t (:foreground "#66d9ef" :underline t))))
  '(region  ((t (:background "#273126"))))
  '(hl-line ((t (:background "#202020"))))
- '(minibuffer-prompt ((t (:foreground "#66d9ef" :weight bold))))
+ '(minibuffer-prompt ((t (:foreground "#fd971f" :weight bold))))
  '(trailing-whitespace ((t (:background "#f92672"))))
 
  ;; Lines / borders
@@ -54,17 +54,22 @@
  '(warning ((t (:foreground "#fd971f" :weight bold))))
  '(success ((t (:foreground "#a6e22e" :weight bold))))
 
- ;; Header / mode line (neutral — slabos-chrome does powerline)
+ ;; Header / mode line (chrome file owns most of this)
  '(mode-line ((t (:background "#181a1c" :foreground "#e8e3d6" :box nil))))
- '(mode-line-inactive ((t (:background "#1c1e1f" :foreground "#807a6a" :box nil))))
- '(header-line ((t (:background "#141517" :foreground "#b7b1a1" :box nil))))
+ '(mode-line-inactive ((t (:background "#181a1c" :foreground "#807a6a" :box nil))))
+ '(header-line ((t (:background "#181a1c" :foreground "#b7b1a1" :box nil))))
 
- ;; Completion
+ ;; Vertico (minibuffer completion)
  '(vertico-current ((t (:background "#202020" :foreground "#e8e3d6" :weight bold))))
+
+ ;; Corfu (popup completion)
  '(corfu-default ((t (:background "#202020" :foreground "#e8e3d6"))))
+ '(corfu-border  ((t (:background "#2d2e2e"))))
  '(corfu-current ((t (:background "#181a1c" :foreground "#e8e3d6" :weight bold))))
- '(corfu-border ((t (:background "#2d2e2e"))))
  '(corfu-annotations ((t (:foreground "#807a6a"))))
+ '(corfu-deprecated ((t (:foreground "#807a6a" :strike-through t))))
+ '(corfu-scroll-bar ((t (:background "#2d2e2e"))))
+ '(corfu-scroll-thumb ((t (:background "#807a6a"))))
 
  ;; Which-key
  '(which-key-key-face ((t (:foreground "#66d9ef" :weight bold))))
