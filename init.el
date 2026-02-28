@@ -1,4 +1,4 @@
-;;; init.el --- SlabOS vanilla Emacs (stable, corfu vim-ish keys, magit+cider) -*- lexical-binding: t; -*-
+;;; init.el --- SlabOS vanilla Emacs (Doom-level Elisp pop) -*- lexical-binding: t; -*-
 
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 (when (file-exists-p custom-file)
@@ -24,6 +24,10 @@
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 (add-to-list 'custom-theme-load-path (expand-file-name "themes" user-emacs-directory))
 
+;; Ensure our config files are always Elisp mode
+(add-to-list 'auto-mode-alist '("init\\.el\\'" . emacs-lisp-mode))
+(add-to-list 'auto-mode-alist '("early-init\\.el\\'" . emacs-lisp-mode))
+
 (require 'package)
 (setq package-archives
       '(("gnu"   . "https://elpa.gnu.org/packages/")
@@ -44,9 +48,45 @@
 
 (load-theme 'slabos-monokai t)
 
+;; Font-lock should be maximum everywhere
+(setq font-lock-maximum-decoration t)
+(setq-default font-lock-maximum-decoration t)
+(global-font-lock-mode 1)
+
+;; Parens
 (show-paren-mode 1)
 (setq show-paren-delay 0
       show-paren-style 'mixed)
+
+;; ---------------------------------------------------------------------------
+;; “Doom sauce” for Elisp semantic pop
+;; ---------------------------------------------------------------------------
+
+(use-package highlight-quoted
+  :hook ((emacs-lisp-mode . highlight-quoted-mode)
+         (lisp-interaction-mode . highlight-quoted-mode)))
+
+(use-package highlight-defined
+  :hook ((emacs-lisp-mode . highlight-defined-mode)
+         (lisp-interaction-mode . highlight-defined-mode)))
+
+;; Emacs 29+ semantic faces (these are what Doom-like setups rely on)
+(defun slabos/apply-elisp-semantic-faces ()
+  (when (facep 'font-lock-function-call-face)
+    (set-face-attribute 'font-lock-function-call-face nil
+                        :foreground "#b6f35a" :weight 'bold))
+  (when (facep 'font-lock-variable-use-face)
+    (set-face-attribute 'font-lock-variable-use-face nil
+                        :foreground "#e8e3d6" :weight 'normal))
+  (when (facep 'font-lock-property-use-face)
+    (set-face-attribute 'font-lock-property-use-face nil
+                        :foreground "#66d9ef"))
+  (when (facep 'font-lock-number-face)
+    (set-face-attribute 'font-lock-number-face nil
+                        :foreground "#e6b450" :weight 'bold)))
+
+(add-hook 'emacs-lisp-mode-hook #'slabos/apply-elisp-semantic-faces)
+(add-hook 'lisp-interaction-mode-hook #'slabos/apply-elisp-semantic-faces)
 
 ;; ---------------------------------------------------------------------------
 ;; Completion stack
@@ -54,7 +94,12 @@
 
 (use-package vertico
   :init (vertico-mode 1)
-  :custom (vertico-cycle t))
+  :custom (vertico-cycle t)
+  :config
+  (define-key vertico-map (kbd "C-j") #'vertico-next)
+  (define-key vertico-map (kbd "C-k") #'vertico-previous)
+  (define-key vertico-map (kbd "C-l") #'vertico-exit)
+  (define-key vertico-map (kbd "C-h") #'vertico-directory-delete-char))
 
 (use-package orderless
   :custom
@@ -72,8 +117,7 @@
          ("M-y" . consult-yank-pop)))
 
 (use-package corfu
-  :init
-  (global-corfu-mode 1)
+  :init (global-corfu-mode 1)
   :custom
   (corfu-auto t)
   (corfu-auto-delay 0.0)
@@ -83,68 +127,21 @@
   (corfu-max-width 90)
   (corfu-count 14)
   :config
-  ;; IMPORTANT: keep any old/broken margin config dead
   (setq corfu-margin-formatters nil
-        corfu-right-margin-width 0
-        corfu-left-margin-width 0)
+        corfu-left-margin-width 0
+        corfu-right-margin-width 0)
 
   (when (boundp 'corfu-border-width)
     (setq corfu-border-width 2))
 
-  ;; SlabOS Corfu styling
-  (set-face-attribute 'corfu-default nil
-                      :background "#202020"
-                      :foreground "#e8e3d6")
+  (set-face-attribute 'corfu-default nil :background "#202020" :foreground "#e8e3d6" :box nil)
+  (set-face-attribute 'corfu-border  nil :background "#2d2e2e" :foreground "#2d2e2e")
+  (set-face-attribute 'corfu-current nil :background "#181a1c" :foreground "#ffffff" :weight 'bold :underline nil)
 
-  (set-face-attribute 'corfu-border nil
-                      :background "#2d2e2e"
-                      :foreground "#2d2e2e")
-
-  (set-face-attribute 'corfu-current nil
-                      :background "#181a1c"
-                      :foreground "#ffffff"
-                      :weight 'bold
-                      :underline nil)
-
-  ;; Match highlights
-  (dolist (f '(orderless-match-face-0 orderless-match-face-1
-               orderless-match-face-2 orderless-match-face-3))
-    (when (facep f)
-      (set-face-attribute f nil :foreground "#66d9ef" :weight 'bold)))
-
-  (when (facep 'completions-common-part)
-    (set-face-attribute 'completions-common-part nil
-                        :foreground "#66d9ef"
-                        :weight 'bold))
-  (when (facep 'completions-first-difference)
-    (set-face-attribute 'completions-first-difference nil
-                        :foreground "#fd971f"
-                        :weight 'bold))
-
-  (when (facep 'corfu-common)
-    (set-face-attribute 'corfu-common nil :foreground "#66d9ef" :weight 'bold))
-  (when (facep 'corfu-common-selected)
-    (set-face-attribute 'corfu-common-selected nil :foreground "#66d9ef" :weight 'bold))
-
-  (when (facep 'corfu-annotations)
-    (set-face-attribute 'corfu-annotations nil :foreground "#807a6a"))
-
-  (when (facep 'corfu-scroll-bar)
-    (set-face-attribute 'corfu-scroll-bar nil :background "#2d2e2e"))
-  (when (facep 'corfu-scroll-thumb)
-    (set-face-attribute 'corfu-scroll-thumb nil :background "#fd971f"))
-
-  ;; Vim-ish movement in the popup (only active while Corfu is open)
   (define-key corfu-map (kbd "C-j") #'corfu-next)
   (define-key corfu-map (kbd "C-k") #'corfu-previous)
-  (define-key corfu-map (kbd "C-n") #'corfu-next)
-  (define-key corfu-map (kbd "C-p") #'corfu-previous)
   (define-key corfu-map (kbd "C-l") #'corfu-insert)
-  (define-key corfu-map (kbd "C-h") #'corfu-quit)
-  (define-key corfu-map (kbd "<escape>") #'corfu-quit)
-  (define-key corfu-map (kbd "RET") #'corfu-insert)
-  (define-key corfu-map (kbd "TAB") #'corfu-insert)
-  (define-key corfu-map (kbd "<tab>") #'corfu-insert))
+  (define-key corfu-map (kbd "<escape>") #'corfu-quit))
 
 (use-package cape
   :init
@@ -161,8 +158,7 @@
         which-key-side-window-location 'bottom
         which-key-side-window-max-height 0.18
         which-key-side-window-slot -10)
-  :config
-  (which-key-mode 1))
+  :config (which-key-mode 1))
 
 ;; ---------------------------------------------------------------------------
 ;; Evil + leader
@@ -187,72 +183,31 @@
     :states '(normal visual motion)
     :prefix "SPC"
     :keymaps 'override)
-
   (slab/leader
-    "f"   '(:ignore t :which-key "files")
     "f f" '(find-file :which-key "find")
-    "f r" '(consult-recent-file :which-key "recent")
-
-    "b"   '(:ignore t :which-key "buffers")
     "b b" '(consult-buffer :which-key "switch")
-    "b k" '(kill-current-buffer :which-key "kill")
-
-    "s"   '(:ignore t :which-key "search")
     "s s" '(consult-line :which-key "line")
     "s g" '(consult-ripgrep :which-key "ripgrep")
-
-    "g"   '(:ignore t :which-key "git")
     "g s" '(magit-status :which-key "status")
-
-    "c"   '(:ignore t :which-key "clojure")
     "c j" '(cider-jack-in-clj :which-key "jack-in (clj)")
-    "c r" '(cider-repl :which-key "repl")
-
-    "r"   '(:ignore t :which-key "repl")
-    "r e" '(ielm :which-key "ielm")))
+    "c r" '(cider-repl :which-key "repl")))
 
 (use-package magit)
 (use-package clojure-mode :mode ("\\.clj\\'" "\\.cljs\\'" "\\.cljc\\'" "\\.edn\\'"))
 (use-package cider :after clojure-mode)
 
+(use-package rainbow-delimiters
+  :hook ((prog-mode . rainbow-delimiters-mode)
+         (emacs-lisp-mode . rainbow-delimiters-mode)
+         (clojure-mode . rainbow-delimiters-mode)))
+
 ;; macOS clipboard keys
 (defun slabos/paste () (interactive) (yank))
-(defun slabos/copy () (interactive)
-       (when (use-region-p)
-         (kill-ring-save (region-beginning) (region-end))
-         (deactivate-mark)))
-(defun slabos/cut () (interactive)
-       (when (use-region-p)
-         (kill-region (region-beginning) (region-end))))
-(defun slabos/select-all () (interactive)
-       (goto-char (point-min))
-       (push-mark (point-max) nil t))
-
 (global-set-key (kbd "s-v") #'slabos/paste)
-(global-set-key (kbd "s-c") #'slabos/copy)
-(global-set-key (kbd "s-x") #'slabos/cut)
-(global-set-key (kbd "s-a") #'slabos/select-all)
-(global-set-key (kbd "s-z") #'undo)
-
 (with-eval-after-load 'evil
-  (define-key evil-insert-state-map (kbd "s-v") #'slabos/paste)
-  (define-key evil-insert-state-map (kbd "s-c") #'slabos/copy)
-  (define-key evil-insert-state-map (kbd "s-x") #'slabos/cut)
-  (define-key evil-insert-state-map (kbd "s-a") #'slabos/select-all)
-  (define-key evil-insert-state-map (kbd "s-z") #'undo))
+  (define-key evil-insert-state-map (kbd "s-v") #'slabos/paste))
 
 (require 'slabos-chrome)
 (slabos-init-chrome)
 
 ;;; init.el ends here
-
-(with-eval-after-load 'vertico
-  ;; Vim-ish movement in the minibuffer menu (Vertico)
-  (define-key vertico-map (kbd "C-j") #'vertico-next)
-  (define-key vertico-map (kbd "C-k") #'vertico-previous)
-  (define-key vertico-map (kbd "C-l") #'vertico-exit)
-  (define-key vertico-map (kbd "C-h") #'vertico-directory-delete-char)
-
-  ;; Also keep the classic Emacs keys working
-  (define-key vertico-map (kbd "C-n") #'vertico-next)
-  (define-key vertico-map (kbd "C-p") #'vertico-previous))
