@@ -1,4 +1,4 @@
-;;; init.el --- SlabOS vanilla Emacs (stable) -*- lexical-binding: t; -*-
+;;; init.el --- SlabOS vanilla Emacs (goal: replicate SlabOS screenshot) -*- lexical-binding: t; -*-
 
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 (when (file-exists-p custom-file)
@@ -13,19 +13,21 @@
               indent-tabs-mode nil
               tab-width 2)
 
+;; Keep minibuffer/echo area as a tight 1-line HUD.
+(setq resize-mini-windows nil
+      max-mini-window-height 1)
+
 ;; ---------------------------------------------------------------------------
-;; macOS: disable native window tabbing (the white tab bar)
+;; macOS modifiers + macOS clipboard keys
 ;; ---------------------------------------------------------------------------
 
 (when (eq system-type 'darwin)
-  ;; Don't use macOS "window tabs" (this is the ugly white strip)
-  (setq ns-use-native-tab-bar nil)
-  ;; If the function exists (varies by build), force it off:
-  (when (fboundp 'mac-toggle-tab-bar)
-    (ignore-errors (mac-toggle-tab-bar -1))))
+  (setq mac-command-modifier 'super)
+  (setq mac-option-modifier 'meta)
+  (setq ns-use-native-tab-bar nil))
 
 ;; ---------------------------------------------------------------------------
-;; Kill compilation spam (native-comp warnings)
+;; Kill compilation spam
 ;; ---------------------------------------------------------------------------
 
 (setq native-comp-async-report-warnings-errors nil)
@@ -55,12 +57,8 @@
                     :height 120
                     :weight 'semi-light)
 
-;; Theme
-(condition-case err
-    (load-theme 'slabos-monokai t)
-  (error
-   (message "Theme load failed: %s" (error-message-string err))
-   (load-theme 'tango-dark t)))
+;; Theme (your literal CSS-token theme)
+(load-theme 'slabos-monokai t)
 
 ;; Completion
 (use-package vertico
@@ -95,33 +93,33 @@
   (add-to-list 'completion-at-point-functions #'cape-file)
   (add-to-list 'completion-at-point-functions #'cape-dabbrev))
 
-;; Which-key
+;; Which-key as the minibuffer HUD (SlabOS-style)
 (use-package which-key
   :init
-  (setq which-key-idle-delay 0.4
+  (setq which-key-idle-delay 0.35
         which-key-idle-secondary-delay 0.05
         which-key-sort-order 'which-key-key-order-alpha
         which-key-max-display-columns 3
-        which-key-min-display-lines 4
-        which-key-side-window-location 'bottom
-        which-key-side-window-max-height 0.25)
+        which-key-min-display-lines 1)
   :config
-  (which-key-mode 1))
+  (which-key-mode 1)
+  (which-key-setup-minibuffer))
 
 ;; Evil
 (setq evil-want-keybinding nil)
 
 (use-package evil
-  :init
-  (setq evil-want-integration t)
+  :init (setq evil-want-integration t)
   :config
-  (evil-mode 1))
+  (evil-mode 1)
+  (setq evil-echo-state nil))
 
 (use-package evil-collection
   :after evil
   :config
   (evil-collection-init))
 
+;; Leader key (SPC)
 (use-package general
   :after evil
   :config
@@ -134,15 +132,12 @@
     "f"   '(:ignore t :which-key "files")
     "f f" '(find-file :which-key "find")
     "f r" '(consult-recent-file :which-key "recent")
-
     "b"   '(:ignore t :which-key "buffers")
     "b b" '(consult-buffer :which-key "switch")
     "b k" '(kill-current-buffer :which-key "kill")
-
     "s"   '(:ignore t :which-key "search")
     "s s" '(consult-line :which-key "line")
     "s g" '(consult-ripgrep :which-key "ripgrep")
-
     "r"   '(:ignore t :which-key "repl")
     "r e" '(ielm :which-key "ielm")))
 
@@ -153,7 +148,7 @@
          ("C-h k" . helpful-key)
          ("C-h x" . helpful-command)))
 
-;; Lisp vibes
+;; Lisp vibes (optional)
 (use-package rainbow-delimiters
   :hook ((prog-mode . rainbow-delimiters-mode)
          (emacs-lisp-mode . rainbow-delimiters-mode)
@@ -162,8 +157,7 @@
 (use-package smartparens
   :hook ((prog-mode . smartparens-mode)
          (ielm-mode . smartparens-mode))
-  :config
-  (require 'smartparens-config))
+  :config (require 'smartparens-config))
 
 (use-package eros
   :hook ((emacs-lisp-mode . eros-mode)
@@ -178,16 +172,36 @@
         ielm-dynamic-return t))
 
 ;; ---------------------------------------------------------------------------
-;; Tabs: we render our own; hide Emacs' tab-bar UI
+;; macOS clipboard keys (work in Evil insert too)
 ;; ---------------------------------------------------------------------------
 
-(tab-bar-mode 1)
-(setq tab-bar-show nil
-      tab-bar-close-button-show nil
-      tab-bar-new-button-show nil)
+(defun slabos/paste () (interactive) (yank))
+(defun slabos/copy () (interactive)
+       (when (use-region-p)
+         (kill-ring-save (region-beginning) (region-end))
+         (deactivate-mark)))
+(defun slabos/cut () (interactive)
+       (when (use-region-p)
+         (kill-region (region-beginning) (region-end))))
+(defun slabos/select-all () (interactive)
+       (goto-char (point-min))
+       (push-mark (point-max) nil t))
 
-;; SlabOS chrome (top + bottom powerline)
-(when (require 'slabos-chrome nil 'noerror)
-  (ignore-errors (slabos-init-chrome)))
+(global-set-key (kbd "s-v") #'slabos/paste)
+(global-set-key (kbd "s-c") #'slabos/copy)
+(global-set-key (kbd "s-x") #'slabos/cut)
+(global-set-key (kbd "s-a") #'slabos/select-all)
+(global-set-key (kbd "s-z") #'undo)
+
+(with-eval-after-load 'evil
+  (define-key evil-insert-state-map (kbd "s-v") #'slabos/paste)
+  (define-key evil-insert-state-map (kbd "s-c") #'slabos/copy)
+  (define-key evil-insert-state-map (kbd "s-x") #'slabos/cut)
+  (define-key evil-insert-state-map (kbd "s-a") #'slabos/select-all)
+  (define-key evil-insert-state-map (kbd "s-z") #'undo))
+
+;; Chrome
+(require 'slabos-chrome)
+(slabos-init-chrome)
 
 ;;; init.el ends here

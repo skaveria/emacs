@@ -1,115 +1,99 @@
-;;; slabos-chrome.el --- SlabOS powerline chrome (stable) -*- lexical-binding: t; -*-
+;;; slabos-chrome.el --- SlabOS chrome: powerline wedges everywhere -*- lexical-binding: t; -*-
 
 (defgroup slabos-chrome nil
   "SlabOS UI chrome."
   :group 'convenience)
 
 ;; If powerline glyphs show as tofu, change to "▶" and "◀".
-(defcustom slabos-pl-left ""
-  "Powerline left separator glyph."
-  :type 'string
-  :group 'slabos-chrome)
+(defcustom slabos-pl-left ""  "Powerline left separator glyph."  :type 'string :group 'slabos-chrome)
+(defcustom slabos-pl-right "" "Powerline right separator glyph." :type 'string :group 'slabos-chrome)
 
-(defcustom slabos-pl-right ""
-  "Powerline right separator glyph."
-  :type 'string
-  :group 'slabos-chrome)
+;; CSS token ports
+(defconst slabos/bg             "#1c1e1f")  ;; content bg
+(defconst slabos/line           "#2d2e2e")
+(defconst slabos/fg             "#e8e3d6")
+(defconst slabos/muted          "#b7b1a1")
+(defconst slabos/dim            "#807a6a")
+(defconst slabos/orange         "#fd971f")
+(defconst slabos/titlebar-field "#141517")  ;; dark segment base
+(defconst slabos/bar            "#181a1c")  ;; ALL bars base
 
-;; CSS token ports (doom-monokai.css)
-(defconst slabos/bg             "#1c1e1f")  ;; --bg
-(defconst slabos/block          "#202020")  ;; --block
-(defconst slabos/line           "#2d2e2e")  ;; --line
-(defconst slabos/fg             "#e8e3d6")  ;; --fg
-(defconst slabos/muted          "#b7b1a1")  ;; --muted
-(defconst slabos/dim            "#807a6a")  ;; --dim
-(defconst slabos/orange         "#fd971f")  ;; --orange
-(defconst slabos/yellow         "#e6b450")  ;; --yellow
-(defconst slabos/titlebar-field "#141517")  ;; --titlebar-field
-(defconst slabos/titlebar-right "#181a1c")  ;; --titlebar-seg-right
+;; “color-mix(hdr-color 18%, #000)” vibe: makes segment fill distinct vs the bar.
+(defconst slabos/seg-fill "#22160b")
 
 (defun slabos--pad (s) (concat " " s " "))
-
 (defun slabos--face (bg fg &optional weight)
   (list :background bg :foreground fg :weight (or weight 'normal) :box nil))
 
-(defun slabos--seg (text face)
-  (propertize (slabos--pad text) 'face face))
+(defun slabos--seg (text bg fg &optional weight)
+  (propertize (slabos--pad text) 'face (slabos--face bg fg weight)))
+
+(defun slabos--sep (glyph from-bg to-bg)
+  (propertize glyph 'face (slabos--face from-bg to-bg)))
 
 (defun slabos--sep-left (from-bg to-bg)
-  (propertize slabos-pl-left 'face (slabos--face from-bg to-bg)))
+  (slabos--sep slabos-pl-left from-bg to-bg))
 
 (defun slabos--sep-right (from-bg to-bg)
-  (propertize slabos-pl-right 'face (slabos--face from-bg to-bg)))
+  (slabos--sep slabos-pl-right from-bg to-bg))
+
+(defun slabos--clock () (format-time-string "%H:%M"))
 
 (defun slabos--project-name ()
   (when (fboundp 'project-current)
     (when-let ((p (project-current nil)))
       (file-name-nondirectory (directory-file-name (project-root p))))))
 
-(defun slabos--clock ()
-  (format-time-string "%H:%M"))
+(defun slabos--label ()
+  (or (slabos--project-name) "emacs"))
+
+;; Blinking chevron (titlebar only, like your CSS)
+(defvar slabos--chev-on t)
+(defvar slabos--chev-timer nil)
+
+(defun slabos--ensure-chevron-timer ()
+  (unless slabos--chev-timer
+    (setq slabos--chev-timer
+          (run-with-timer
+           0 1.1
+           (lambda ()
+             (setq slabos--chev-on (not slabos--chev-on))
+             (force-mode-line-update t))))))
+
+(defun slabos--chevron ()
+  (if slabos--chev-on "›" " "))
 
 ;; -------------------------
-;; Tabs / workspace list
+;; TITLEBAR (header-line)
 ;; -------------------------
 
-(defun slabos--tab-names ()
-  (when (bound-and-true-p tab-bar-mode)
-    (mapcar (lambda (tab) (alist-get 'name tab))
-            (funcall tab-bar-tabs-function))))
-
-(defun slabos--active-tab ()
-  (when (bound-and-true-p tab-bar-mode)
-    (alist-get 'name (tab-bar--current-tab))))
-
-(defun slabos--render-tabs ()
-  (let* ((tabs (slabos--tab-names))
-         (active (slabos--active-tab)))
-    (when tabs
-      (mapconcat
-       (lambda (nm)
-         (if (and active (string= nm active))
-             (propertize (slabos--pad nm)
-                         'face (slabos--face slabos/titlebar-right slabos/fg 'bold))
-           (propertize (slabos--pad nm)
-                       'face (slabos--face slabos/titlebar-right slabos/muted))))
-       tabs
-       ""))))
-
-;; -------------------------
-;; Header-line (top strip)
-;; -------------------------
-
-(defun slabos--header-left ()
-  (let* ((title (or (slabos--project-name) "emacs")))
+(defun slabos--titlebar-left ()
+  (let ((label (slabos--label)))
     (concat
-     (slabos--seg title (slabos--face slabos/titlebar-field slabos/orange 'bold))
-     (slabos--sep-left slabos/titlebar-field slabos/titlebar-right)
-     (slabos--seg "" (slabos--face slabos/titlebar-right slabos/fg)))))
+     (slabos--seg label slabos/seg-fill slabos/orange 'bold)
+     (slabos--seg (slabos--chevron) slabos/seg-fill slabos/orange 'bold)
+     (slabos--sep-left slabos/seg-fill slabos/bar))))
 
-(defun slabos--header-right ()
+(defun slabos--titlebar-right ()
   (let ((time (slabos--clock)))
     (concat
-     (slabos--seg "" (slabos--face slabos/titlebar-right slabos/fg))
-     (slabos--sep-right slabos/titlebar-right slabos/titlebar-right)
-     (slabos--seg time (slabos--face slabos/titlebar-right slabos/orange 'bold)))))
+     (slabos--sep-right slabos/bar slabos/bar)
+     (slabos--seg time slabos/bar slabos/orange 'bold))))
 
-(defun slabos--header-line ()
-  (let ((left (slabos--header-left))
-        (tabs (or (slabos--render-tabs) ""))
-        (right (slabos--header-right)))
+(defun slabos--titlebar ()
+  (let ((left (slabos--titlebar-left))
+        (right (slabos--titlebar-right)))
     (concat
      left
-     tabs
-     (propertize " " 'face (slabos--face slabos/titlebar-right slabos/fg)
+     (propertize " " 'face (slabos--face slabos/bar slabos/fg)
                  'display `((space :align-to (- right ,(length right)))))
      right)))
 
-(defun slabos-enable-top-strip ()
-  (setq-default header-line-format '(:eval (slabos--header-line))))
+(defun slabos-enable-titlebar ()
+  (setq-default header-line-format '(:eval (slabos--titlebar))))
 
 ;; -------------------------
-;; Mode-line (bottom strip)
+;; MODELINE (powerline segments)
 ;; -------------------------
 
 (defun slabos--evil-state ()
@@ -120,7 +104,7 @@
       ('visual "V")
       ('replace "R")
       ('emacs "E")
-      (_ "?"))))
+      (_ ""))))
 
 (defun slabos--buffer-id ()
   (let ((name (buffer-name)))
@@ -129,48 +113,76 @@
 (defun slabos--pos ()
   (format "L%s C%s" (format-mode-line "%l") (format-mode-line "%c")))
 
-(defun slabos--mode-line ()
+(defun slabos--modeline ()
   (let* ((state (or (slabos--evil-state) ""))
-         (buf (slabos--buffer-id))
-         (pos (slabos--pos)))
+         (buf   (slabos--buffer-id))
+         (pos   (slabos--pos))
+
+         ;; Segment backgrounds
+         (bg-a slabos/seg-fill)      ;; left segment
+         (bg-b slabos/bar)           ;; middle segment
+         (bg-c slabos/titlebar-field) ;; right segment (darker than bar, like screenshot wedges)
+
+         (fg-a slabos/orange)
+         (fg-b slabos/fg)
+         (fg-c slabos/orange)
+
+         ;; Pre-render right to compute align-to width
+         (right (concat
+                 (slabos--sep-right bg-b bg-c)
+                 (slabos--seg pos bg-c fg-c 'bold))))
     (concat
-     (slabos--seg (if (string-empty-p state) " " state)
-                  (slabos--face slabos/titlebar-field slabos/orange 'bold))
-     (slabos--sep-left slabos/titlebar-field slabos/bg)
-     (slabos--seg buf (slabos--face slabos/bg slabos/fg 'bold))
-     ;; NOTE: this was the broken paren site. Now it is correct.
-     (propertize " " 'face (slabos--face slabos/bg slabos/fg)
-                 'display `((space :align-to (- right ,(+ 2 (length pos))))))
+     ;; Left: state on warm fill
+     (slabos--seg (if (string-empty-p state) " " state) bg-a fg-a 'bold)
+     (slabos--sep-left bg-a bg-b)
 
-     (slabos--sep-right slabos/bg slabos/titlebar-right)
-     (slabos--seg pos (slabos--face slabos/titlebar-right slabos/orange 'bold)))))
+     ;; Middle: buffer on bar base
+     (slabos--seg buf bg-b fg-b 'bold)
 
-(defun slabos-enable-mode-line ()
-  (setq-default mode-line-format '((:eval (slabos--mode-line)))))
+     ;; Align to right segment
+     (propertize " " 'face (slabos--face bg-b fg-b)
+                 'display `((space :align-to (- right ,(length right)))))
 
-(defun slabos-minimize-mode-line-noise ()
+     right)))
+
+(defun slabos-enable-modeline ()
+  ;; Ensure the built-in faces don't fight us.
+  (set-face-attribute 'mode-line nil :box nil :background slabos/bar :foreground slabos/fg)
+  (set-face-attribute 'mode-line-inactive nil :box nil :background slabos/bar :foreground slabos/dim)
+
+  ;; Remove minor-mode spam
   (setq-default mode-line-modes '("" mode-name))
-  (setq-default mode-line-process nil))
+  (setq-default mode-line-process nil)
+
+  (setq-default mode-line-format '((:eval (slabos--modeline)))))
 
 ;; -------------------------
-;; Init
+;; Minibuffer / echo area: always slabos/bar (so the "dead strip" disappears)
 ;; -------------------------
 
-(defun slabos-enable-tabs ()
-  (tab-bar-mode 1)
-  (setq tab-bar-show nil
-        tab-bar-close-button-show nil
-        tab-bar-new-button-show nil))
+(defvar slabos--minibuffer-cookie nil)
 
+(defun slabos--minibuffer-style ()
+  (when slabos--minibuffer-cookie
+    (face-remap-remove-relative slabos--minibuffer-cookie)
+    (setq slabos--minibuffer-cookie nil))
+  (setq slabos--minibuffer-cookie
+        (face-remap-add-relative 'default `(:background ,slabos/bar :foreground ,slabos/fg)))
+  (set-face-attribute 'minibuffer-prompt nil :foreground slabos/orange :weight 'bold))
+
+(add-hook 'minibuffer-setup-hook #'slabos--minibuffer-style)
+
+;; Borders
+(defun slabos-apply-lines ()
+  (set-face-attribute 'vertical-border nil :foreground slabos/line))
+
+;; Public
 (defun slabos-init-chrome ()
-  "Enable SlabOS header and modeline."
-  (set-face-attribute 'header-line nil :box nil :background slabos/titlebar-right :foreground slabos/fg)
-  (set-face-attribute 'mode-line nil :box nil :background slabos/titlebar-right :foreground slabos/fg)
-  (set-face-attribute 'mode-line-inactive nil :box nil :background slabos/bg :foreground slabos/dim)
-  (slabos-enable-tabs)
-  (slabos-enable-top-strip)
-  (slabos-minimize-mode-line-noise)
-  (slabos-enable-mode-line))
+  (slabos--ensure-chevron-timer)
+  (set-face-attribute 'header-line nil :box nil :background slabos/bar :foreground slabos/fg)
+  (slabos-apply-lines)
+  (slabos-enable-titlebar)
+  (slabos-enable-modeline))
 
 (provide 'slabos-chrome)
-;;; slabos-chrome.el ends here
+;;; slabos-chrome.el ends her
