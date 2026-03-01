@@ -51,7 +51,7 @@
   (format-time-string "%H:%M"))
 
 ;; -------------------------
-;; Header-line (top strip) with blinking chevron + time
+;; Header-line (top strip) — now true powerline chips
 ;; -------------------------
 
 (defvar slabos--chev-on t)
@@ -70,19 +70,31 @@
   (if slabos--chev-on "›" " "))
 
 (defun slabos--header-line ()
+  "SlabOS header-line: chips on the left, time on the right."
   (let* ((title (or (slabos--project-name) "emacs"))
          (time  (slabos--clock))
-         (left  (concat
-                 (slabos--seg title (slabos--face slabos/titlebar-field slabos/orange 'bold))
-                 (slabos--seg (slabos--chevron) (slabos--face slabos/titlebar-field slabos/orange 'bold))
-                 (slabos--sep-left slabos/titlebar-field slabos/titlebar-right)))
+
+         ;; chip backgrounds (top bar)
+         (bg-field slabos/titlebar-field)  ;; darkest (full bar)
+         (bg-title slabos/titlebar-right)  ;; dark chip
+         (bg-chev  "#2a2c2e")              ;; mid chip (adds separation)
+         (bg-time  slabos/titlebar-right)  ;; dark chip
+
          (right (concat
-                 (slabos--sep-right slabos/titlebar-right slabos/titlebar-right)
-                 (slabos--seg time (slabos--face slabos/titlebar-right slabos/orange 'bold)))))
+                 (slabos--seg time (slabos--face bg-time slabos/orange 'bold)))))
     (concat
-     left
-     (propertize " " 'face (slabos--face slabos/titlebar-right slabos/fg)
+     ;; LEFT chips: [title][chevron]
+     (slabos--seg title (slabos--face bg-title slabos/orange 'bold))
+     (slabos--sep-left bg-title bg-chev)
+     (slabos--seg (slabos--chevron) (slabos--face bg-chev slabos/orange 'bold))
+     (slabos--sep-left bg-chev bg-field)
+
+     ;; FILL
+     (propertize " " 'face (slabos--face bg-field slabos/fg)
                  'display `((space :align-to (- right ,(length right)))))
+
+     ;; RIGHT chip: [time]
+     (slabos--sep-right bg-field bg-time)
      right)))
 
 (defun slabos-enable-top-strip ()
@@ -110,20 +122,39 @@
   (format "L%s C%s" (format-mode-line "%l") (format-mode-line "%c")))
 
 (defun slabos--modeline ()
-  "SlabOS modeline: state+buffer on the left, mode+pos on the right."
+  "SlabOS modeline with distinct powerline chips."
   (let* ((state (or (slabos--evil-state) ""))
          (buf   (slabos--buffer-id))
          (mode  (format-mode-line mode-name))
          (pos   (slabos--pos))
+
+         ;; High contrast segment backgrounds
+         (bg-state slabos/titlebar-field)  ;; #141517
+         (bg-buf   "#2a2c2e")              ;; mid
+         ;; Whole bar dark like titlebar-field
+         (bg-fill  slabos/titlebar-field)  ;; #141517
+         (bg-mode  "#3a3d40")              ;; lighter
+         (bg-pos   "#232527")              ;; dark-mid
+
          (right (concat
-                 (slabos--seg mode (slabos--face slabos/titlebar-right slabos/yellow 'bold))
-                 (slabos--seg pos  (slabos--face slabos/titlebar-right slabos/orange 'bold)))))
+                 (slabos--seg mode (slabos--face bg-mode slabos/yellow 'bold))
+                 (slabos--sep-right bg-mode bg-pos)
+                 (slabos--seg pos (slabos--face bg-pos slabos/orange 'bold)))))
     (concat
-     (slabos--seg state (slabos--face slabos/titlebar-field slabos/orange 'bold))
-     (slabos--sep-left slabos/titlebar-field slabos/bg)
-     (slabos--seg buf   (slabos--face slabos/bg slabos/fg 'bold))
-     (propertize " " 'face (slabos--face slabos/titlebar-right slabos/fg)
+     ;; STATE CHIP
+     (slabos--seg state (slabos--face bg-state slabos/orange 'bold))
+     (slabos--sep-left bg-state bg-buf)
+
+     ;; BUFFER CHIP (distinct tag)
+     (slabos--seg buf (slabos--face bg-buf slabos/fg 'bold))
+     (slabos--sep-left bg-buf bg-fill)
+
+     ;; FILL (dark like titlebar-field)
+     (propertize " "
+                 'face (slabos--face bg-fill slabos/muted)
                  'display `((space :align-to (- right ,(length right)))))
+
+     ;; RIGHT CLUSTER
      right)))
 
 (defun slabos-enable-mode-line ()
@@ -140,12 +171,13 @@
 (defun slabos-init-chrome ()
   "Enable SlabOS header and modeline."
   (slabos--ensure-chevron-timer)
-  ;; Faces
-  (set-face-attribute 'header-line nil :box nil :background slabos/titlebar-right :foreground slabos/fg)
-  (set-face-attribute 'mode-line nil :box nil :background slabos/titlebar-right :foreground slabos/fg)
+
+  ;; Faces: make the bar field dark like the titlebar-field
+  (set-face-attribute 'header-line nil :box nil :background slabos/titlebar-field :foreground slabos/fg)
+  (set-face-attribute 'mode-line nil :box nil :background slabos/titlebar-field :foreground slabos/fg)
   (set-face-attribute 'mode-line-inactive nil :box nil :background slabos/bg :foreground slabos/dim)
   (set-face-attribute 'vertical-border nil :foreground slabos/line)
-  ;; Enable strips
+
   (slabos-enable-top-strip)
   (slabos-minimize-mode-line-noise)
   (slabos-enable-mode-line))
