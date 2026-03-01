@@ -84,6 +84,21 @@
       show-paren-style 'mixed)
 
 ;; ---------------------------------------------------------------------------
+;; Line numbers (everywhere, with a few sane exceptions)
+;; ---------------------------------------------------------------------------
+
+(setq display-line-numbers-type 'relative) ;; use 't for absolute everywhere
+(global-display-line-numbers-mode 1)
+
+(dolist (hook '(org-mode-hook
+                vterm-mode-hook
+                ielm-mode-hook
+                eshell-mode-hook
+                term-mode-hook
+                shell-mode-hook))
+  (add-hook hook (lambda () (display-line-numbers-mode -1))))
+
+;; ---------------------------------------------------------------------------
 ;; Completion stack (Vertico/Orderless/Marginalia/Consult/Corfu)
 ;; ---------------------------------------------------------------------------
 
@@ -151,10 +166,17 @@
 (setq evil-want-keybinding nil)
 
 (use-package evil
-  :init (setq evil-want-integration t)
+  :init
+  (setq evil-want-integration t)
   :config
   (evil-mode 1)
-  (setq evil-echo-state nil))
+  (setq evil-echo-state nil)
+
+  ;; SINGLE-TAP ESC FIX (global)
+  (setq evil-esc-delay 0.0
+        evil-esc-timeout 0.0)
+  (define-key evil-insert-state-map (kbd "<escape>") #'evil-force-normal-state)
+  (define-key evil-visual-state-map (kbd "<escape>") #'evil-force-normal-state))
 
 (use-package evil-collection
   :after evil
@@ -168,6 +190,11 @@
     :states '(normal visual motion)
     :prefix "SPC"
     :keymaps 'override))
+
+;; Also force ESC in elisp buffers (some minor modes can swallow it)
+(with-eval-after-load 'elisp-mode
+  (define-key emacs-lisp-mode-map (kbd "<escape>") #'evil-force-normal-state)
+  (define-key lisp-interaction-mode-map (kbd "<escape>") #'evil-force-normal-state))
 
 ;; ---------------------------------------------------------------------------
 ;; Window + buffer management
@@ -223,8 +250,7 @@
          (lisp-interaction-mode . smartparens-mode)
          (ielm-mode . smartparens-mode)
          (clojure-mode . smartparens-mode))
-  :config
-  (require 'smartparens-config))
+  :config (require 'smartparens-config))
 
 (use-package eros
   :hook ((emacs-lisp-mode . eros-mode)
@@ -236,20 +262,18 @@
          (lisp-interaction-mode . eval-sexp-fu-flash-mode)
          (ielm-mode . eval-sexp-fu-flash-mode)))
 
-;; Call-head semantic fontification (your file exists)
 (when (require 'slabos-lisp-fontify nil 'noerror)
   (add-hook 'emacs-lisp-mode-hook #'slabos-enable-elisp-call-heads)
   (add-hook 'lisp-interaction-mode-hook #'slabos-enable-elisp-call-heads)
   (add-hook 'clojure-mode-hook #'slabos-enable-clj-call-heads))
 
 ;; ---------------------------------------------------------------------------
-;; Org (built-in) + src highlighting (robust)
+;; Org (built-in) + src highlighting
 ;; ---------------------------------------------------------------------------
 
 (use-package org
   :ensure nil
   :init
-  ;; Must be set before org loads
   (setq org-directory (expand-file-name "~/org")
         org-agenda-files (list (expand-file-name "~/org"))
         org-startup-indented t
@@ -270,24 +294,15 @@
 (use-package clojure-mode)
 
 (with-eval-after-load 'org
-  ;; Your resolver already returns clojure-mode, but keep explicit mapping anyway.
   (add-to-list 'org-src-lang-modes '("clojure" . clojure))
   (add-to-list 'org-src-lang-modes '("clj" . clojure))
   (add-to-list 'org-src-lang-modes '("cljc" . clojure))
   (add-to-list 'org-src-lang-modes '("cljs" . clojure)))
 
 (defun slabos/org-refontify ()
-  "Hard refontify Org buffer including src blocks."
   (interactive)
-  ;; reset font-lock
   (font-lock-mode -1)
-  (font-lock-mode 1)
-  ;; force org to re-parse and re-fontify
-  (when (fboundp 'org-ctrl-c-ctrl-c)
-    (save-excursion
-      (goto-char (point-min))
-      ;; triggers org to refresh context in some cases
-      (org-ctrl-c-ctrl-c))))
+  (font-lock-mode 1))
 
 (defun slabos/org-debug-src ()
   (interactive)
@@ -305,17 +320,11 @@
   (setq vterm-shell "/bin/zsh"
         vterm-max-scrollback 20000)
   :config
-  ;; Pass PATH explicitly (so vterm sees /opt/homebrew/bin even if shell changes it)
   (setq vterm-environment (list (concat "PATH=" (getenv "PATH"))))
-
-  (defun slabos/vterm-send-esc ()
-    (interactive)
-    (vterm-send-key "<escape>"))
-
+  (defun slabos/vterm-send-esc () (interactive) (vterm-send-key "<escape>"))
   (add-hook 'vterm-mode-hook
             (lambda ()
-              (when (bound-and-true-p evil-local-mode)
-                (evil-insert-state))
+              (evil-insert-state)
               (define-key vterm-mode-map (kbd "<escape>") #'evil-normal-state)
               (define-key vterm-mode-map (kbd "C-c <escape>") #'slabos/vterm-send-esc)
               (define-key vterm-mode-map (kbd "s-v") #'vterm-yank))))
@@ -328,28 +337,24 @@
       (vterm "*vterm*"))))
 
 ;; ---------------------------------------------------------------------------
-;; Leader bindings (restore expected)
+;; Leader bindings
 ;; ---------------------------------------------------------------------------
 
 (slab/leader
-  ;; files
   "f"   '(:ignore t :which-key "files")
   "f f" '(find-file :which-key "find file")
   "f r" '(consult-recent-file :which-key "recent")
 
-  ;; search
   "s"   '(:ignore t :which-key "search")
   "s s" '(consult-line :which-key "search line")
   "s g" '(consult-ripgrep :which-key "ripgrep")
 
-  ;; buffers
   "b"   '(:ignore t :which-key "buffers")
   "b b" '(consult-buffer :which-key "switch")
   "b i" '(ibuffer :which-key "ibuffer")
   "b k" '(kill-current-buffer :which-key "kill")
   "b d" '(slabos/kill-buffer-and-window :which-key "kill+window")
 
-  ;; windows
   "w"   '(:ignore t :which-key "windows")
   "w h" '(windmove-left :which-key "left")
   "w j" '(windmove-down :which-key "down")
@@ -364,11 +369,8 @@
   "w o" '(delete-other-windows :which-key "only")
   "w d" '(delete-window :which-key "delete")
 
-  ;; open
   "o"   '(:ignore t :which-key "open")
   "o t" '(slabos/vterm-here :which-key "vterm")
-
-  ;; org debug helpers
   "o ?" '(slabos/org-debug-src :which-key "org src debug")
   "o f" '(slabos/org-refontify :which-key "org refontify"))
 
