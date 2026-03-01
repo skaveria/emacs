@@ -1,11 +1,15 @@
-;;; init.el --- SlabOS vanilla Emacs (clean) -*- lexical-binding: t; -*-
+;;; init.el --- SlabOS vanilla Emacs (stable: lisp fontify + org src + vterm) -*- lexical-binding: t; -*-
 
-;; Keep Customize out of init
+(require 'subr-x)
+
+;; ---------------------------------------------------------------------------
+;; Core hygiene
+;; ---------------------------------------------------------------------------
+
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 (when (file-exists-p custom-file)
   (load custom-file 'noerror 'nomessage))
 
-;; Quiet UX
 (setq inhibit-startup-screen t
       initial-scratch-message ""
       ring-bell-function #'ignore
@@ -15,11 +19,24 @@
               indent-tabs-mode nil
               tab-width 2)
 
-;; macOS modifiers + prevent native window tabs
+;; ---------------------------------------------------------------------------
+;; macOS: modifiers + PATH (Homebrew)
+;; ---------------------------------------------------------------------------
+
 (when (eq system-type 'darwin)
   (setq mac-command-modifier 'super
         mac-option-modifier 'meta
-        ns-use-native-tab-bar nil))
+        ns-use-native-tab-bar nil)
+
+  ;; Force /opt/homebrew/bin ahead of everything else, always.
+  (let* ((brew-paths '("/opt/homebrew/bin" "/opt/homebrew/sbin"
+                       "/usr/local/bin" "/usr/local/sbin"))
+         (cur (split-string (or (getenv "PATH") "") ":" t))
+         (merged (delete-dups (append brew-paths cur))))
+    (dolist (p brew-paths)
+      (when (file-directory-p p)
+        (add-to-list 'exec-path p)))
+    (setenv "PATH" (string-join merged ":"))))
 
 ;; Keep native-comp chatter down
 (setq native-comp-async-report-warnings-errors nil)
@@ -30,14 +47,14 @@
 (add-to-list 'custom-theme-load-path (expand-file-name "themes" user-emacs-directory))
 
 ;; ---------------------------------------------------------------------------
-;; Packages
+;; Packages (package.el + use-package)
 ;; ---------------------------------------------------------------------------
 
 (require 'package)
 (setq package-archives
-      '(("gnu"   . "https://elpa.gnu.org/packages/")
-        ("nongnu". "https://elpa.nongnu.org/nongnu/")
-        ("melpa" . "https://melpa.org/packages/")))
+      '(("gnu"    . "https://elpa.gnu.org/packages/")
+        ("nongnu" . "https://elpa.nongnu.org/nongnu/")
+        ("melpa"  . "https://melpa.org/packages/")))
 (package-initialize)
 
 (unless (package-installed-p 'use-package)
@@ -47,7 +64,7 @@
 (setq use-package-always-ensure t)
 
 ;; ---------------------------------------------------------------------------
-;; Fonts + Theme + core visuals
+;; Fonts + Theme
 ;; ---------------------------------------------------------------------------
 
 (set-face-attribute 'default nil
@@ -57,19 +74,23 @@
 
 (load-theme 'slabos-monokai t)
 
+;; Make sure font-lock is actually on everywhere
+(setq font-lock-maximum-decoration t)
+(setq-default font-lock-maximum-decoration t)
+(global-font-lock-mode 1)
+
 (show-paren-mode 1)
 (setq show-paren-delay 0
       show-paren-style 'mixed)
 
 ;; ---------------------------------------------------------------------------
-;; Completion stack (Vertico + Corfu)
+;; Completion stack (Vertico/Orderless/Marginalia/Consult/Corfu)
 ;; ---------------------------------------------------------------------------
 
 (use-package vertico
   :init (vertico-mode 1)
   :custom (vertico-cycle t)
   :config
-  ;; Vim-ish navigation in Vertico
   (define-key vertico-map (kbd "C-j") #'vertico-next)
   (define-key vertico-map (kbd "C-k") #'vertico-previous)
   (define-key vertico-map (kbd "C-l") #'vertico-exit)
@@ -97,26 +118,17 @@
   (corfu-auto-delay 0.0)
   (corfu-auto-prefix 1)
   (corfu-cycle t)
-  (corfu-min-width 40)
-  (corfu-max-width 90)
-  (corfu-count 14)
   :config
-  ;; Keep margins off (stable)
   (setq corfu-margin-formatters nil
         corfu-left-margin-width 0
         corfu-right-margin-width 0)
   (when (boundp 'corfu-border-width)
     (setq corfu-border-width 2))
-
-  ;; SlabOS Corfu styling
   (set-face-attribute 'corfu-default nil :background "#202020" :foreground "#bdbdbd" :box nil)
   (set-face-attribute 'corfu-border  nil :background "#2d2e2e" :foreground "#2d2e2e")
   (set-face-attribute 'corfu-current nil :background "#181a1c" :foreground "#ffffff" :weight 'bold :underline nil)
-
-  ;; Vim-ish popup nav
   (define-key corfu-map (kbd "C-j") #'corfu-next)
   (define-key corfu-map (kbd "C-k") #'corfu-previous)
-  (define-key corfu-map (kbd "C-l") #'corfu-insert)
   (define-key corfu-map (kbd "<escape>") #'corfu-quit))
 
 (use-package cape
@@ -128,12 +140,7 @@
   :init
   (setq which-key-idle-delay 0.35
         which-key-idle-secondary-delay 0.05
-        which-key-sort-order 'which-key-key-order-alpha
-        which-key-max-display-columns 3
-        which-key-min-display-lines 3
-        which-key-side-window-location 'bottom
-        which-key-side-window-max-height 0.18
-        which-key-side-window-slot -10)
+        which-key-sort-order 'which-key-key-order-alpha)
   :config
   (which-key-mode 1))
 
@@ -147,12 +154,12 @@
   :init (setq evil-want-integration t)
   :config
   (evil-mode 1)
-  ;; SlabOS: no echo spam
   (setq evil-echo-state nil))
 
 (use-package evil-collection
   :after evil
-  :config (evil-collection-init))
+  :config
+  (evil-collection-init))
 
 (use-package general
   :after evil
@@ -160,41 +167,47 @@
   (general-create-definer slab/leader
     :states '(normal visual motion)
     :prefix "SPC"
-    :keymaps 'override)
-
-  ;; Core
-  (slab/leader
-    "f f" '(find-file :which-key "find file")
-    "b b" '(consult-buffer :which-key "buffers")
-    "s s" '(consult-line :which-key "search line")
-    "s g" '(consult-ripgrep :which-key "ripgrep")
-
-    ;; Windows
-    "w"   '(:ignore t :which-key "windows")
-    "w s" '(split-window-below :which-key "split below")
-    "w v" '(split-window-right :which-key "split right")
-    "w d" '(delete-window :which-key "delete")
-    "w o" '(delete-other-windows :which-key "only")
-    "w h" '(windmove-left :which-key "left")
-    "w j" '(windmove-down :which-key "down")
-    "w k" '(windmove-up :which-key "up")
-    "w l" '(windmove-right :which-key "right")
-
-    ;; Git
-    "g"   '(:ignore t :which-key "git")
-    "g s" '(magit-status :which-key "status")
-
-    ;; Clojure
-    "c"   '(:ignore t :which-key "clojure")
-    "c j" '(cider-jack-in-clj :which-key "jack-in")
-    "c r" '(cider-repl :which-key "repl")
-
-    ;; ELisp repl
-    "r"   '(:ignore t :which-key "repl")
-    "r e" '(ielm :which-key "ielm")))
+    :keymaps 'override))
 
 ;; ---------------------------------------------------------------------------
-;; Lisp experience
+;; Window + buffer management
+;; ---------------------------------------------------------------------------
+
+(require 'windmove)
+
+(defun slabos/window-swap-left  () (interactive) (windmove-swap-states 'left))
+(defun slabos/window-swap-right () (interactive) (windmove-swap-states 'right))
+(defun slabos/window-swap-up    () (interactive) (windmove-swap-states 'up))
+(defun slabos/window-swap-down  () (interactive) (windmove-swap-states 'down))
+
+(global-set-key (kbd "C-x C-b") #'ibuffer)
+
+(defun slabos/kill-buffer-and-window ()
+  (interactive)
+  (kill-buffer (current-buffer))
+  (when (window-parent)
+    (delete-window)))
+
+;; ---------------------------------------------------------------------------
+;; macOS clipboard (restore cmd-v in Evil insert)
+;; ---------------------------------------------------------------------------
+
+(defun slabos/paste () (interactive) (yank))
+(global-set-key (kbd "s-v") #'slabos/paste)
+(global-set-key (kbd "s-c") #'kill-ring-save)
+(global-set-key (kbd "s-x") #'kill-region)
+(global-set-key (kbd "s-a") #'mark-whole-buffer)
+(global-set-key (kbd "s-z") #'undo)
+
+(with-eval-after-load 'evil
+  (define-key evil-insert-state-map (kbd "s-v") #'slabos/paste)
+  (define-key evil-insert-state-map (kbd "s-c") #'kill-ring-save)
+  (define-key evil-insert-state-map (kbd "s-x") #'kill-region)
+  (define-key evil-insert-state-map (kbd "s-a") #'mark-whole-buffer)
+  (define-key evil-insert-state-map (kbd "s-z") #'undo))
+
+;; ---------------------------------------------------------------------------
+;; Lisp experience (yesterday’s work)
 ;; ---------------------------------------------------------------------------
 
 (use-package rainbow-delimiters
@@ -202,20 +215,7 @@
          (emacs-lisp-mode . rainbow-delimiters-mode)
          (lisp-interaction-mode . rainbow-delimiters-mode)
          (ielm-mode . rainbow-delimiters-mode)
-         (clojure-mode . rainbow-delimiters-mode))
-  :config
-  ;; Your swapped palette (orange/pink swapped) – keep as-is
-  (set-face-attribute 'rainbow-delimiters-depth-1-face nil :foreground "#f92672" :weight 'bold)
-  (set-face-attribute 'rainbow-delimiters-depth-2-face nil :foreground "#fd971f" :weight 'bold)
-  (set-face-attribute 'rainbow-delimiters-depth-3-face nil :foreground "#a6e22e" :weight 'bold)
-  (set-face-attribute 'rainbow-delimiters-depth-4-face nil :foreground "#ffbe00" :weight 'bold)
-  (set-face-attribute 'rainbow-delimiters-depth-5-face nil :foreground "#66d9ef" :weight 'bold)
-  (set-face-attribute 'rainbow-delimiters-depth-6-face nil :foreground "#f92672" :weight 'bold)
-  (set-face-attribute 'rainbow-delimiters-depth-7-face nil :foreground "#fd971f" :weight 'bold)
-  (set-face-attribute 'rainbow-delimiters-depth-8-face nil :foreground "#a6e22e" :weight 'bold)
-  (set-face-attribute 'rainbow-delimiters-depth-9-face nil :foreground "#ffbe00" :weight 'bold)
-  (set-face-attribute 'rainbow-delimiters-unmatched-face nil
-                      :foreground "#ffffff" :background "#f92672" :weight 'bold))
+         (clojure-mode . rainbow-delimiters-mode)))
 
 (use-package smartparens
   :hook ((prog-mode . smartparens-mode)
@@ -236,28 +236,141 @@
          (lisp-interaction-mode . eval-sexp-fu-flash-mode)
          (ielm-mode . eval-sexp-fu-flash-mode)))
 
-;; Our new call-head semantic fontification
-(require 'slabos-lisp-fontify)
-(add-hook 'emacs-lisp-mode-hook #'slabos-enable-elisp-call-heads)
-(add-hook 'lisp-interaction-mode-hook #'slabos-enable-elisp-call-heads)
-(add-hook 'clojure-mode-hook #'slabos-enable-clj-call-heads)
+;; Call-head semantic fontification (your file exists)
+(when (require 'slabos-lisp-fontify nil 'noerror)
+  (add-hook 'emacs-lisp-mode-hook #'slabos-enable-elisp-call-heads)
+  (add-hook 'lisp-interaction-mode-hook #'slabos-enable-elisp-call-heads)
+  (add-hook 'clojure-mode-hook #'slabos-enable-clj-call-heads))
 
 ;; ---------------------------------------------------------------------------
-;; Dev tools
+;; Org (built-in) + src highlighting (robust)
 ;; ---------------------------------------------------------------------------
 
-(use-package magit)
-(use-package clojure-mode :mode ("\\.clj\\'" "\\.cljs\\'" "\\.cljc\\'" "\\.edn\\'"))
-(use-package cider :after clojure-mode)
+(use-package org
+  :ensure nil
+  :init
+  ;; Must be set before org loads
+  (setq org-directory (expand-file-name "~/org")
+        org-agenda-files (list (expand-file-name "~/org"))
+        org-startup-indented t
+        org-hide-emphasis-markers t
+        org-ellipsis " ▾"
+        org-src-fontify-natively t
+        org-src-tab-acts-natively t
+        org-src-preserve-indentation t
+        org-edit-src-content-indentation 0)
+  :config
+  (require 'org-src)
+  (add-hook 'org-mode-hook
+            (lambda ()
+              (visual-line-mode 1)
+              (setq-local display-line-numbers nil)
+              (font-lock-mode 1))))
+
+(use-package clojure-mode)
+
+(with-eval-after-load 'org
+  ;; Your resolver already returns clojure-mode, but keep explicit mapping anyway.
+  (add-to-list 'org-src-lang-modes '("clojure" . clojure))
+  (add-to-list 'org-src-lang-modes '("clj" . clojure))
+  (add-to-list 'org-src-lang-modes '("cljc" . clojure))
+  (add-to-list 'org-src-lang-modes '("cljs" . clojure)))
+
+(defun slabos/org-refontify ()
+  "Hard refontify Org buffer including src blocks."
+  (interactive)
+  ;; reset font-lock
+  (font-lock-mode -1)
+  (font-lock-mode 1)
+  ;; force org to re-parse and re-fontify
+  (when (fboundp 'org-ctrl-c-ctrl-c)
+    (save-excursion
+      (goto-char (point-min))
+      ;; triggers org to refresh context in some cases
+      (org-ctrl-c-ctrl-c))))
+
+(defun slabos/org-debug-src ()
+  (interactive)
+  (message "org-src-get-lang-mode(clojure) => %S ; org-src-fontify-natively=%S"
+           (org-src-get-lang-mode "clojure")
+           org-src-fontify-natively))
 
 ;; ---------------------------------------------------------------------------
-;; macOS clipboard
+;; vterm (simple + reliable)
 ;; ---------------------------------------------------------------------------
 
-(defun slabos/paste () (interactive) (yank))
-(global-set-key (kbd "s-v") #'slabos/paste)
-(with-eval-after-load 'evil
-  (define-key evil-insert-state-map (kbd "s-v") #'slabos/paste))
+(use-package vterm
+  :commands vterm
+  :init
+  (setq vterm-shell "/bin/zsh"
+        vterm-max-scrollback 20000)
+  :config
+  ;; Pass PATH explicitly (so vterm sees /opt/homebrew/bin even if shell changes it)
+  (setq vterm-environment (list (concat "PATH=" (getenv "PATH"))))
+
+  (defun slabos/vterm-send-esc ()
+    (interactive)
+    (vterm-send-key "<escape>"))
+
+  (add-hook 'vterm-mode-hook
+            (lambda ()
+              (when (bound-and-true-p evil-local-mode)
+                (evil-insert-state))
+              (define-key vterm-mode-map (kbd "<escape>") #'evil-normal-state)
+              (define-key vterm-mode-map (kbd "C-c <escape>") #'slabos/vterm-send-esc)
+              (define-key vterm-mode-map (kbd "s-v") #'vterm-yank))))
+
+(defun slabos/vterm-here ()
+  (interactive)
+  (let ((buf (get-buffer "*vterm*")))
+    (if (buffer-live-p buf)
+        (switch-to-buffer buf)
+      (vterm "*vterm*"))))
+
+;; ---------------------------------------------------------------------------
+;; Leader bindings (restore expected)
+;; ---------------------------------------------------------------------------
+
+(slab/leader
+  ;; files
+  "f"   '(:ignore t :which-key "files")
+  "f f" '(find-file :which-key "find file")
+  "f r" '(consult-recent-file :which-key "recent")
+
+  ;; search
+  "s"   '(:ignore t :which-key "search")
+  "s s" '(consult-line :which-key "search line")
+  "s g" '(consult-ripgrep :which-key "ripgrep")
+
+  ;; buffers
+  "b"   '(:ignore t :which-key "buffers")
+  "b b" '(consult-buffer :which-key "switch")
+  "b i" '(ibuffer :which-key "ibuffer")
+  "b k" '(kill-current-buffer :which-key "kill")
+  "b d" '(slabos/kill-buffer-and-window :which-key "kill+window")
+
+  ;; windows
+  "w"   '(:ignore t :which-key "windows")
+  "w h" '(windmove-left :which-key "left")
+  "w j" '(windmove-down :which-key "down")
+  "w k" '(windmove-up :which-key "up")
+  "w l" '(windmove-right :which-key "right")
+  "w H" '(slabos/window-swap-left  :which-key "swap left")
+  "w J" '(slabos/window-swap-down  :which-key "swap down")
+  "w K" '(slabos/window-swap-up    :which-key "swap up")
+  "w L" '(slabos/window-swap-right :which-key "swap right")
+  "w s" '(split-window-below :which-key "split below")
+  "w v" '(split-window-right :which-key "split right")
+  "w o" '(delete-other-windows :which-key "only")
+  "w d" '(delete-window :which-key "delete")
+
+  ;; open
+  "o"   '(:ignore t :which-key "open")
+  "o t" '(slabos/vterm-here :which-key "vterm")
+
+  ;; org debug helpers
+  "o ?" '(slabos/org-debug-src :which-key "org src debug")
+  "o f" '(slabos/org-refontify :which-key "org refontify"))
 
 ;; ---------------------------------------------------------------------------
 ;; SlabOS chrome
