@@ -14,3 +14,6 @@ git rm -r --cached elpagit rm -r --cached eln-cachegit rm -r --cached auto-sav
 cd .config/emacs/ 
 git rm -r --cached elpagit rm -r --cached eln-cachegit rm -r --cached auto-save-listgit rm --cached custom.el
 exit 
+clear 
+fastfetch 
+clear 

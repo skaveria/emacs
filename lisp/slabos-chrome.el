@@ -1,124 +1,106 @@
-;;; slabos-chrome.el --- SlabOS chrome: correct powerline fg/bg semantics + state colors -*- lexical-binding: t; -*-
+;;; slabos-chrome.el --- SlabOS powerline chrome -*- lexical-binding: t; -*-
 
 (defgroup slabos-chrome nil
   "SlabOS UI chrome."
   :group 'convenience)
 
-(defcustom slabos-pl-left ""  "Powerline left separator glyph."  :type 'string :group 'slabos-chrome)
-(defcustom slabos-pl-right "" "Powerline right separator glyph." :type 'string :group 'slabos-chrome)
+(defcustom slabos-pl-left ""
+  "Powerline left separator glyph."
+  :type 'string
+  :group 'slabos-chrome)
 
-;; CSS token ports
-(defconst slabos/bg             "#1c1e1f")  ;; content bg
+(defcustom slabos-pl-right ""
+  "Powerline right separator glyph."
+  :type 'string
+  :group 'slabos-chrome)
+
+;; CSS token ports (keep these in sync with your theme)
+(defconst slabos/bg             "#1c1e1f")
+(defconst slabos/block          "#202020")
 (defconst slabos/line           "#2d2e2e")
-(defconst slabos/fg             "#e8e3d6")
+(defconst slabos/fg             "#bdbdbd")
 (defconst slabos/muted          "#b7b1a1")
 (defconst slabos/dim            "#807a6a")
-
-;; SlabOS accent palette
 (defconst slabos/orange         "#fd971f")
-(defconst slabos/green          "#a6e22e")
-(defconst slabos/pink           "#f92672")
-(defconst slabos/yellow         "#e6b450")
-(defconst slabos/cyan           "#66d9ef")
+(defconst slabos/yellow         "#ffbe00")
+(defconst slabos/titlebar-field "#141517")
+(defconst slabos/titlebar-right "#181a1c")
 
-(defconst slabos/bar            "#181a1c")  ;; bar field
-
-;; Segment backgrounds (chosen for contrast + correct wedges)
-(defconst slabos/state-bg  "#141517")  ;; darker grey (carved)
-(defconst slabos/buf-bg    "#202020")  ;; lighter grey (block)
-(defconst slabos/time-bg   "#141517")  ;; carved like screenshot
-(defconst slabos/badge-bg  "#2b1b0c")  ;; warm badge fill (top left)
+(defun slabos--pad (s) (concat " " s " "))
 
 (defun slabos--face (bg fg &optional weight)
   (list :background bg :foreground fg :weight (or weight 'normal) :box nil))
 
-(defun slabos--seg (text bg fg &optional weight lpad rpad)
-  (let ((lp (or lpad " "))
-        (rp (or rpad " ")))
-    (propertize (concat lp text rp) 'face (slabos--face bg fg weight))))
+(defun slabos--seg (text face)
+  (propertize (slabos--pad text) 'face face))
 
-;; POWERLINE RULE:
-;; left separator : background = current bg, foreground = next bg
-(defun slabos--pl-left (cur-bg next-bg)
-  (propertize slabos-pl-left 'face (slabos--face cur-bg next-bg)))
+(defun slabos--sep-left (from-bg to-bg)
+  ;;  : background = from, foreground = to
+  (propertize slabos-pl-left 'face (slabos--face from-bg to-bg)))
 
-;; right separator : background = current bg, foreground = next bg
-(defun slabos--pl-right (cur-bg next-bg)
-  (propertize slabos-pl-right 'face (slabos--face cur-bg next-bg)))
-
-(defun slabos--clock () (format-time-string "%H:%M"))
+(defun slabos--sep-right (from-bg to-bg)
+  ;;  : background = from, foreground = to
+  (propertize slabos-pl-right 'face (slabos--face from-bg to-bg)))
 
 (defun slabos--project-name ()
   (when (fboundp 'project-current)
     (when-let ((p (project-current nil)))
       (file-name-nondirectory (directory-file-name (project-root p))))))
 
-(defun slabos--label () (or (slabos--project-name) "emacs"))
+(defun slabos--clock ()
+  (format-time-string "%H:%M"))
 
-;; Blink chevron in title
+;; -------------------------
+;; Header-line (top strip) with blinking chevron + time
+;; -------------------------
+
 (defvar slabos--chev-on t)
 (defvar slabos--chev-timer nil)
 
 (defun slabos--ensure-chevron-timer ()
   (unless slabos--chev-timer
     (setq slabos--chev-timer
-          (run-with-timer 0 1.1
-                          (lambda ()
-                            (setq slabos--chev-on (not slabos--chev-on))
-                            (force-mode-line-update t))))))
+          (run-with-timer
+           0 1.1
+           (lambda ()
+             (setq slabos--chev-on (not slabos--chev-on))
+             (force-mode-line-update t))))))
 
 (defun slabos--chevron ()
   (if slabos--chev-on "›" " "))
 
-;; -------------------------
-;; Header-line titlebar (badge -> field -> time)
-;; -------------------------
-
-(defun slabos--titlebar ()
-  (let* ((label (slabos--label))
-         (time (slabos--clock))
-         (left (concat
-                (slabos--seg label slabos/badge-bg slabos/orange 'bold " " "")
-                (slabos--seg (slabos--chevron) slabos/badge-bg slabos/orange 'bold " " "")
-                (slabos--pl-left slabos/badge-bg slabos/bar)))
+(defun slabos--header-line ()
+  (let* ((title (or (slabos--project-name) "emacs"))
+         (time  (slabos--clock))
+         (left  (concat
+                 (slabos--seg title (slabos--face slabos/titlebar-field slabos/orange 'bold))
+                 (slabos--seg (slabos--chevron) (slabos--face slabos/titlebar-field slabos/orange 'bold))
+                 (slabos--sep-left slabos/titlebar-field slabos/titlebar-right)))
          (right (concat
-                 (slabos--pl-right slabos/bar slabos/time-bg)
-                 (slabos--seg time slabos/time-bg slabos/orange 'bold " " " "))))
+                 (slabos--sep-right slabos/titlebar-right slabos/titlebar-right)
+                 (slabos--seg time (slabos--face slabos/titlebar-right slabos/orange 'bold)))))
     (concat
      left
-     (propertize " " 'face (slabos--face slabos/bar slabos/fg)
+     (propertize " " 'face (slabos--face slabos/titlebar-right slabos/fg)
                  'display `((space :align-to (- right ,(length right)))))
      right)))
 
-(defun slabos-enable-titlebar ()
-  (setq-default header-line-format '(:eval (slabos--titlebar))))
+(defun slabos-enable-top-strip ()
+  (setq-default header-line-format '(:eval (slabos--header-line))))
 
 ;; -------------------------
-;; Modeline (STATE -> BUFFER -> FIELD -> POS) with state colors
+;; Modeline (bottom strip): state + buffer | right-aligned mode + pos
 ;; -------------------------
 
 (defun slabos--evil-state ()
-  "Return short evil state string."
   (when (bound-and-true-p evil-local-mode)
     (pcase evil-state
-      ('normal  "N")
-      ('insert  "I")
-      ('visual  "V")
+      ('normal "N")
+      ('insert "I")
+      ('visual "V")
       ('replace "R")
-      ('emacs   "E")
-      (_        ""))))
-
-(defun slabos--evil-state-color ()
-  "Return SlabOS color for current evil state."
-  (if (not (bound-and-true-p evil-local-mode))
-      slabos/orange
-    (pcase evil-state
-      ('normal  slabos/orange)
-      ('insert  slabos/green)
-      ('visual  slabos/pink)
-      ('replace slabos/yellow)
-      ('emacs   slabos/cyan)
-      (_        slabos/orange))))
+      ('emacs "E")
+      (_ "?"))))
 
 (defun slabos--buffer-id ()
   (let ((name (buffer-name)))
@@ -128,46 +110,45 @@
   (format "L%s C%s" (format-mode-line "%l") (format-mode-line "%c")))
 
 (defun slabos--modeline ()
+  "SlabOS modeline: state+buffer on the left, mode+pos on the right."
   (let* ((state (or (slabos--evil-state) ""))
-         (state-fg (slabos--evil-state-color))
          (buf   (slabos--buffer-id))
+         (mode  (format-mode-line mode-name))
          (pos   (slabos--pos))
-         ;; left segments are flush to wedges (no trailing pad)
-         (seg-state (slabos--seg (if (string-empty-p state) " " state)
-                                 slabos/state-bg state-fg 'bold " " ""))
-         (seg-buf   (slabos--seg buf slabos/buf-bg slabos/fg 'bold " " ""))
-         ;; right segment includes padding
-         (seg-pos   (slabos--seg pos slabos/state-bg slabos/orange 'bold " " " "))
-         (right     (concat (slabos--pl-right slabos/bar slabos/state-bg) seg-pos)))
+         (right (concat
+                 (slabos--seg mode (slabos--face slabos/titlebar-right slabos/yellow 'bold))
+                 (slabos--seg pos  (slabos--face slabos/titlebar-right slabos/orange 'bold)))))
     (concat
-     seg-state
-     ;;  background = state-bg, foreground = buf-bg
-     (slabos--pl-left slabos/state-bg slabos/buf-bg)
-     seg-buf
-     ;;  background = buf-bg, foreground = bar
-     (slabos--pl-left slabos/buf-bg slabos/bar)
-
-     (propertize " " 'face (slabos--face slabos/bar slabos/fg)
+     (slabos--seg state (slabos--face slabos/titlebar-field slabos/orange 'bold))
+     (slabos--sep-left slabos/titlebar-field slabos/bg)
+     (slabos--seg buf   (slabos--face slabos/bg slabos/fg 'bold))
+     (propertize " " 'face (slabos--face slabos/titlebar-right slabos/fg)
                  'display `((space :align-to (- right ,(length right)))))
-
      right)))
 
-(defun slabos-enable-modeline ()
-  (set-face-attribute 'mode-line nil :box nil :background slabos/bar :foreground slabos/fg)
-  (set-face-attribute 'mode-line-inactive nil :box nil :background slabos/bar :foreground slabos/dim)
-  (setq-default mode-line-modes '("" mode-name))
-  (setq-default mode-line-process nil)
+(defun slabos-enable-mode-line ()
   (setq-default mode-line-format '((:eval (slabos--modeline)))))
 
-(defun slabos-apply-lines ()
-  (set-face-attribute 'vertical-border nil :foreground slabos/line))
+(defun slabos-minimize-mode-line-noise ()
+  (setq-default mode-line-modes '("" mode-name))
+  (setq-default mode-line-process nil))
+
+;; -------------------------
+;; Init
+;; -------------------------
 
 (defun slabos-init-chrome ()
+  "Enable SlabOS header and modeline."
   (slabos--ensure-chevron-timer)
-  (set-face-attribute 'header-line nil :box nil :background slabos/bar :foreground slabos/fg)
-  (slabos-apply-lines)
-  (slabos-enable-titlebar)
-  (slabos-enable-modeline))
+  ;; Faces
+  (set-face-attribute 'header-line nil :box nil :background slabos/titlebar-right :foreground slabos/fg)
+  (set-face-attribute 'mode-line nil :box nil :background slabos/titlebar-right :foreground slabos/fg)
+  (set-face-attribute 'mode-line-inactive nil :box nil :background slabos/bg :foreground slabos/dim)
+  (set-face-attribute 'vertical-border nil :foreground slabos/line)
+  ;; Enable strips
+  (slabos-enable-top-strip)
+  (slabos-minimize-mode-line-noise)
+  (slabos-enable-mode-line))
 
 (provide 'slabos-chrome)
 ;;; slabos-chrome.el ends here
