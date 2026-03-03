@@ -99,7 +99,7 @@
      (slabos--seg title (slabos--face bg-title slabos/orange 'bold))
 
      ;; Keep this one normal (it reads cleanly)
-     (slabos--sep-left* bg-title bg-chev nil)
+     (slabos--sep-left* bg-title bg-chev t)
 
      (slabos--seg (slabos--chevron) (slabos--face bg-chev slabos/orange 'bold))
 
