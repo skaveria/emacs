@@ -421,3 +421,11 @@
       (vterm--redraw)))
 
   (add-hook 'vterm-mode-hook #'slabos/vterm-apply-slabos-faces))
+
+(when (file-exists-p (expand-file-name "lisp/diffinator.el" user-emacs-directory))
+  (load (expand-file-name "lisp/diffinator.el" user-emacs-directory) nil t))
+
+(with-eval-after-load 'general
+  (slab/leader
+    "c"   '(:ignore t :which-key "code")
+    "c p" '(diffinator-apply-clipboard :which-key "apply diff")))
