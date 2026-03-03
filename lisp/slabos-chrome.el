@@ -42,6 +42,19 @@
   ;;  : background = from, foreground = to
   (propertize slabos-pl-right 'face (slabos--face from-bg to-bg)))
 
+;; Inverted wedges (the “swap chevron colors” move)
+(defun slabos--sep-left* (from-bg to-bg &optional invert)
+  "Powerline left separator. If INVERT is non-nil, swap FROM/TO."
+  (if invert
+      (slabos--sep-left to-bg from-bg)
+    (slabos--sep-left from-bg to-bg)))
+
+(defun slabos--sep-right* (from-bg to-bg &optional invert)
+  "Powerline right separator. If INVERT is non-nil, swap FROM/TO."
+  (if invert
+      (slabos--sep-right to-bg from-bg)
+    (slabos--sep-right from-bg to-bg)))
+
 (defun slabos--project-name ()
   (when (fboundp 'project-current)
     (when-let ((p (project-current nil)))
@@ -51,7 +64,7 @@
   (format-time-string "%H:%M"))
 
 ;; -------------------------
-;; Header-line (top strip) — now true powerline chips
+;; Header-line (top strip)
 ;; -------------------------
 
 (defvar slabos--chev-on t)
@@ -70,38 +83,42 @@
   (if slabos--chev-on "›" " "))
 
 (defun slabos--header-line ()
-  "SlabOS header-line: chips on the left, time on the right."
+  "SlabOS header-line: powerline chips on the left, time on the right."
   (let* ((title (or (slabos--project-name) "emacs"))
          (time  (slabos--clock))
 
          ;; chip backgrounds (top bar)
          (bg-field slabos/titlebar-field)  ;; darkest (full bar)
          (bg-title slabos/titlebar-right)  ;; dark chip
-         (bg-chev  "#2a2c2e")              ;; mid chip (adds separation)
+         (bg-chev  "#2a2c2e")              ;; mid chip
          (bg-time  slabos/titlebar-right)  ;; dark chip
 
-         (right (concat
-                 (slabos--seg time (slabos--face bg-time slabos/orange 'bold)))))
+         (right (slabos--seg time (slabos--face bg-time slabos/orange 'bold))))
     (concat
-     ;; LEFT chips: [title][chevron]
+     ;; LEFT chips
      (slabos--seg title (slabos--face bg-title slabos/orange 'bold))
-     (slabos--sep-left bg-title bg-chev)
+
+     ;; Keep this one normal (it reads cleanly)
+     (slabos--sep-left* bg-title bg-chev nil)
+
      (slabos--seg (slabos--chevron) (slabos--face bg-chev slabos/orange 'bold))
-     (slabos--sep-left bg-chev bg-field)
+
+     ;; FIX #1: chevron -> field wedge polarity (invert this one)
+     (slabos--sep-left* bg-chev bg-field t)
 
      ;; FILL
      (propertize " " 'face (slabos--face bg-field slabos/fg)
                  'display `((space :align-to (- right ,(length right)))))
 
-     ;; RIGHT chip: [time]
-     (slabos--sep-right bg-field bg-time)
+     ;; RIGHT chip
+     (slabos--sep-right* bg-field bg-time nil)
      right)))
 
 (defun slabos-enable-top-strip ()
   (setq-default header-line-format '(:eval (slabos--header-line))))
 
 ;; -------------------------
-;; Modeline (bottom strip): state + buffer | right-aligned mode + pos
+;; Modeline (bottom strip)
 ;; -------------------------
 
 (defun slabos--evil-state ()
@@ -128,28 +145,34 @@
          (mode  (format-mode-line mode-name))
          (pos   (slabos--pos))
 
-         ;; High contrast segment backgrounds
+         ;; Segment backgrounds
          (bg-state slabos/titlebar-field)  ;; #141517
          (bg-buf   "#2a2c2e")              ;; mid
-         ;; Whole bar dark like titlebar-field
-         (bg-fill  slabos/titlebar-field)  ;; #141517
+         (bg-fill  slabos/titlebar-field)  ;; bar field
          (bg-mode  "#3a3d40")              ;; lighter
          (bg-pos   "#232527")              ;; dark-mid
 
+         ;; Right cluster (now with a proper left-cut wedge into mode)
          (right (concat
+                 ;; FIX #3: add fill -> mode wedge so mode chip is a real tag
+                 (slabos--sep-right* bg-fill bg-mode nil)
                  (slabos--seg mode (slabos--face bg-mode slabos/yellow 'bold))
-                 (slabos--sep-right bg-mode bg-pos)
+                 (slabos--sep-right* bg-mode bg-pos nil)
                  (slabos--seg pos (slabos--face bg-pos slabos/orange 'bold)))))
     (concat
      ;; STATE CHIP
      (slabos--seg state (slabos--face bg-state slabos/orange 'bold))
-     (slabos--sep-left bg-state bg-buf)
 
-     ;; BUFFER CHIP (distinct tag)
+     ;; FIX #2: state -> buffer wedge polarity (invert)
+     (slabos--sep-left* bg-state bg-buf t)
+
+     ;; BUFFER CHIP
      (slabos--seg buf (slabos--face bg-buf slabos/fg 'bold))
-     (slabos--sep-left bg-buf bg-fill)
 
-     ;; FILL (dark like titlebar-field)
+     ;; buffer -> field cut (keep inverted; this was one of the “good” ones)
+     (slabos--sep-left* bg-buf bg-fill t)
+
+     ;; FILL
      (propertize " "
                  'face (slabos--face bg-fill slabos/muted)
                  'display `((space :align-to (- right ,(length right)))))
@@ -172,7 +195,7 @@
   "Enable SlabOS header and modeline."
   (slabos--ensure-chevron-timer)
 
-  ;; Faces: make the bar field dark like the titlebar-field
+  ;; Faces: keep the bar field dark like titlebar-field
   (set-face-attribute 'header-line nil :box nil :background slabos/titlebar-field :foreground slabos/fg)
   (set-face-attribute 'mode-line nil :box nil :background slabos/titlebar-field :foreground slabos/fg)
   (set-face-attribute 'mode-line-inactive nil :box nil :background slabos/bg :foreground slabos/dim)

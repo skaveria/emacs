@@ -382,3 +382,42 @@
 (slabos-init-chrome)
 
 ;;; init.el ends here
+
+(with-eval-after-load 'vterm
+  (defun slabos/vterm-apply-slabos-faces ()
+    "Make vterm match SlabOS palette via vterm-color-* faces."
+    (interactive)
+    ;; Base face (what the terminal background/foreground actually uses)
+    (set-face-attribute 'vterm nil
+                        :background "#1c1e1f"
+                        :foreground "#bdbdbd")
+    (set-face-attribute 'vterm-color-default nil
+                        :background "#1c1e1f"
+                        :foreground "#bdbdbd")
+
+    ;; 16-color palette (faces)
+    (set-face-attribute 'vterm-color-black   nil :foreground "#1c1e1f" :background "#1c1e1f")
+    (set-face-attribute 'vterm-color-red     nil :foreground "#f92672" :background "#f92672")
+    (set-face-attribute 'vterm-color-green   nil :foreground "#a6e22e" :background "#a6e22e")
+    (set-face-attribute 'vterm-color-yellow  nil :foreground "#ffbe00" :background "#ffbe00")
+    (set-face-attribute 'vterm-color-blue    nil :foreground "#66d9ef" :background "#66d9ef")
+    ;; Powerline/SlabOS uses orange a lot; map magenta → orange for vibe
+    (set-face-attribute 'vterm-color-magenta nil :foreground "#fd971f" :background "#fd971f")
+    (set-face-attribute 'vterm-color-cyan    nil :foreground "#00c0ff" :background "#00c0ff")
+    (set-face-attribute 'vterm-color-white   nil :foreground "#bdbdbd" :background "#bdbdbd")
+
+    ;; Bright palette (faces) — vterm uses these for “bold/bright”
+    (set-face-attribute 'vterm-color-bright-black   nil :foreground "#2a2c2e" :background "#2a2c2e")
+    (set-face-attribute 'vterm-color-bright-red     nil :foreground "#ff2f7d" :background "#ff2f7d")
+    (set-face-attribute 'vterm-color-bright-green   nil :foreground "#b6f35a" :background "#b6f35a")
+    (set-face-attribute 'vterm-color-bright-yellow  nil :foreground "#ffbe00" :background "#ffbe00")
+    (set-face-attribute 'vterm-color-bright-blue    nil :foreground "#66d9ef" :background "#66d9ef")
+    (set-face-attribute 'vterm-color-bright-magenta nil :foreground "#fd971f" :background "#fd971f")
+    (set-face-attribute 'vterm-color-bright-cyan    nil :foreground "#00c0ff" :background "#00c0ff")
+    (set-face-attribute 'vterm-color-bright-white   nil :foreground "#ffffff" :background "#ffffff")
+
+    ;; Refresh current vterm buffer if applicable
+    (when (derived-mode-p 'vterm-mode)
+      (vterm--redraw)))
+
+  (add-hook 'vterm-mode-hook #'slabos/vterm-apply-slabos-faces))
