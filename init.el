@@ -84,10 +84,40 @@
       show-paren-style 'mixed)
 
 ;; ---------------------------------------------------------------------------
+;; Performance tuning (macOS scroll lag)
+;; ---------------------------------------------------------------------------
+
+;; Reduce GC pauses while scrolling / redisplay.
+(setq gc-cons-threshold (* 100 1024 1024)  ; 100MB
+      gc-cons-percentage 0.6)
+
+;; Emacs 29+ smooth pixel scrolling (great on trackpads).
+(when (fboundp 'pixel-scroll-precision-mode)
+  (pixel-scroll-precision-mode 1))
+
+;; Avoid expensive vscroll bookkeeping (often causes micro-stutter on mac).
+(setq auto-window-vscroll nil)
+
+;; Scroll behavior: avoid recentering / jumpiness.
+(setq scroll-margin 3
+      scroll-step 1
+      scroll-conservatively 101
+      scroll-preserve-screen-position t)
+
+;; Mouse wheel tuning.
+(setq mouse-wheel-scroll-amount '(1 ((shift) . 1))
+      mouse-wheel-progressive-speed nil
+      mouse-wheel-follow-mouse t)
+
+;; Optional speed-ups: prioritize responsiveness during input/scroll.
+(setq fast-but-imprecise-scrolling t
+      redisplay-skip-fontification-on-input t)
+
+;; ---------------------------------------------------------------------------
 ;; Line numbers (everywhere, with a few sane exceptions)
 ;; ---------------------------------------------------------------------------
 
-(setq display-line-numbers-type 'relative) ;; use 't for absolute everywhere
+(setq display-line-numbers-type t) ;; absolute line numbers everywhere
 (global-display-line-numbers-mode 1)
 
 (dolist (hook '(org-mode-hook
